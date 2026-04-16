@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FreeFit Club Search</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    background: #f5f5f5;
+    color: #1a1a1a;
+    line-height: 1.5;
+  }
+  .header {
+    background: #1a1a2e;
+    color: #fff;
+    padding: 24px 0;
+    text-align: center;
+  }
+  .header h1 { font-size: 28px; font-weight: 700; }
+  .header p { color: #aaa; margin-top: 4px; font-size: 14px; }
+  .container { max-width: 900px; margin: 0 auto; padding: 0 16px; }
+  .search-bar {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    padding: 20px;
+    margin: 16px auto 24px;
+    position: relative;
+    z-index: 10;
+  }
+  .search-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .search-row:last-child { margin-bottom: 0; }
+  input[type="text"] {
+    flex: 1;
+    min-width: 200px;
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 16px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input[type="text"]:focus { border-color: #4a6cf7; }
+  select {
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 16px;
+    background: #fff;
+    min-width: 180px;
+    outline: none;
+    cursor: pointer;
+  }
+  select:focus { border-color: #4a6cf7; }
+
+  /* Autocomplete */
+  .ac-wrap { position: relative; flex: 1; min-width: 200px; }
+  .ac-wrap input { width: 100%; }
+  .ac-list {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    background: #fff;
+    border: 2px solid #4a6cf7;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 100;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  }
+  .ac-list.open { display: block; }
+  .ac-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .ac-item:hover, .ac-item.selected { background: #f0f4ff; }
+  .ac-item:last-child { border-bottom: none; }
+  .ac-loading { padding: 12px 16px; color: #999; font-size: 14px; text-align: center; }
+
+  .btn {
+    padding: 12px 18px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: #4a6cf7; background: #f0f4ff; }
+  .btn.active { border-color: #4a6cf7; background: #4a6cf7; color: #fff; }
+  .or-divider { color: #aaa; font-size: 13px; }
+
+  /* View toggle */
+  .view-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: #666;
+  }
+  .view-bar .count { font-weight: 600; color: #1a1a2e; }
+  .loc-info { color: #4a6cf7; font-size: 13px; }
+  .view-toggle {
+    display: flex;
+    gap: 0;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .view-toggle button {
+    padding: 6px 16px;
+    border: none;
+    background: #fff;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .view-toggle button:first-child { border-left: 1px solid #e0e0e0; }
+  .view-toggle button.active { background: #4a6cf7; color: #fff; }
+
+  /* Results list */
+  .results { display: flex; flex-direction: column; gap: 12px; padding-bottom: 40px; }
+  .club-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    transition: box-shadow 0.2s;
+  }
+  .club-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+  .club-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .club-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 6px;
+  }
+  .club-distance {
+    font-size: 13px;
+    color: #fff;
+    background: #4a6cf7;
+    border-radius: 20px;
+    padding: 3px 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .club-address {
+    font-size: 14px;
+    color: #4a6cf7;
+    margin-bottom: 10px;
+  }
+  .club-desc {
+    font-size: 14px;
+    color: #555;
+    max-height: 80px;
+    overflow: hidden;
+    position: relative;
+  }
+  .club-desc.expanded { max-height: none; }
+  .club-desc:not(.expanded)::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    height: 30px;
+    background: linear-gradient(transparent, #fff);
+  }
+  .show-more {
+    background: none;
+    border: none;
+    color: #4a6cf7;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 4px 0;
+    margin-top: 4px;
+  }
+  .no-results {
+    text-align: center;
+    padding: 60px 20px;
+    color: #999;
+    font-size: 18px;
+  }
+  .highlight { background: #fff3b0; border-radius: 2px; }
+
+  /* Map */
+  #map-container {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    margin-bottom: 40px;
+  }
+  #map-container.hidden { height: 0; overflow: hidden; margin: 0; box-shadow: none; }
+  #map { height: 600px; width: 100%; }
+  .map-popup-title { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+  .map-popup-addr { color: #4a6cf7; font-size: 13px; margin-bottom: 6px; }
+  .map-popup-desc { font-size: 12px; color: #555; max-height: 200px; overflow-y: auto; }
+  .map-popup-dist { font-size: 12px; color: #fff; background: #4a6cf7; border-radius: 10px; padding: 2px 8px; display: inline-block; margin-top: 6px; }
+
+  @media (max-width: 600px) {
+    .search-row { flex-direction: column; }
+    select, .btn { min-width: 100%; }
+    .ac-wrap { min-width: 100%; }
+    #map { height: 400px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>FreeFit Club Search</h1>
+  <p>Search across 2,705 fitness clubs in Israel</p>
+</div>
+
+<div class="container">
+  <div class="search-bar">
+    <div class="search-row">
+      <input type="text" id="q" placeholder="...search by name, activity, or keyword" autofocus>
+      <select id="city-filter">
+        <option value="">All cities</option>
+      </select>
+    </div>
+    <div class="search-row">
+      <div class="ac-wrap">
+        <input type="text" id="address-input" placeholder="...type your address to sort by distance" autocomplete="off">
+        <div class="ac-list" id="ac-list"></div>
+      </div>
+      <span class="or-divider">or</span>
+      <button class="btn" id="gps-btn">Use GPS</button>
+      <button class="btn" id="clear-loc-btn" style="display:none">Clear location</button>
+    </div>
+  </div>
+
+  <div class="view-bar">
+    <div>
+      <span>Showing <span class="count" id="result-count">0</span> clubs</span>
+      <span class="loc-info" id="loc-status"></span>
+    </div>
+    <div class="view-toggle">
+      <button id="view-list" class="active">List</button>
+      <button id="view-map">Map</button>
+    </div>
+  </div>
+
+  <div class="results" id="results"></div>
+  <div id="map-container" class="hidden"><div id="map"></div></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<script src="_clubs_data.js"></script>
+<script src="_city_coords.js"></script>
+<script>
+(function() {
+  const qInput = document.getElementById('q');
+  const citySelect = document.getElementById('city-filter');
+  const addressInput = document.getElementById('address-input');
+  const acList = document.getElementById('ac-list');
+  const gpsBtn = document.getElementById('gps-btn');
+  const clearLocBtn = document.getElementById('clear-loc-btn');
+  const resultsDiv = document.getElementById('results');
+  const mapContainer = document.getElementById('map-container');
+  const countEl = document.getElementById('result-count');
+  const locStatus = document.getElementById('loc-status');
+  const viewListBtn = document.getElementById('view-list');
+  const viewMapBtn = document.getElementById('view-map');
+
+  let originLat = null, originLng = null;
+  let acTimer = null, acSelected = -1, acItems = [];
+  let currentView = 'list';
+  let map = null, markerGroup = null, originMarker = null;
+  let lastFiltered = [];
+
+  // Attach coords to each club
+  const addrCoords = typeof ADDR_COORDS !== 'undefined' ? ADDR_COORDS : {};
+  const cityCoords = typeof CITY_COORDS !== 'undefined' ? CITY_COORDS : {};
+  CLUBS.forEach(club => {
+    const ac = addrCoords[club.a];
+    if (ac) { club.lat = ac[0]; club.lng = ac[1]; }
+    else {
+      const cc = cityCoords[club.c];
+      if (cc) { club.lat = cc[0]; club.lng = cc[1]; }
+    }
+  });
+
+  CITIES.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c;
+    opt.textContent = c;
+    citySelect.appendChild(opt);
+  });
+
+  function distanceKm(lat1, lng1, lat2, lng2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function highlightText(text, terms) {
+    if (!terms.length || !text) return escapeHtml(text);
+    let html = escapeHtml(text);
+    terms.forEach(term => {
+      if (!term) return;
+      const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      html = html.replace(new RegExp('(' + escaped + ')', 'gi'), '<span class="highlight">$1</span>');
+    });
+    return html;
+  }
+
+  function formatDist(km) {
+    if (km < 1) return Math.round(km * 1000) + ' m';
+    if (km < 10) return km.toFixed(1) + ' km';
+    return Math.round(km) + ' km';
+  }
+
+  // ── List View ──
+
+  function renderList(filtered, terms) {
+    const show = filtered.slice(0, 100);
+    if (!show.length) {
+      resultsDiv.innerHTML = '<div class="no-results">No clubs found</div>';
+      return;
+    }
+    let html = '';
+    show.forEach(club => {
+      const desc = club.d || '';
+      const needsMore = desc.length > 200;
+      const id = 'desc-' + club.id;
+      const showDist = originLat != null && club._dist != null && club._dist < 99999;
+      html += '<div class="club-card">' +
+        '<div class="club-header">' +
+          '<div class="club-name">' + highlightText(club.t, terms) + '</div>' +
+          (showDist ? '<span class="club-distance">' + formatDist(club._dist) + '</span>' : '') +
+        '</div>' +
+        '<div class="club-address">' + highlightText(club.a, terms) + '</div>' +
+        (desc ? '<div class="club-desc" id="' + id + '">' + highlightText(desc, terms) + '</div>' : '') +
+        (needsMore ? '<button class="show-more" onclick="toggleDesc(\'' + id + '\', this)">show more</button>' : '') +
+        '</div>';
+    });
+    if (filtered.length > 100) {
+      html += '<div class="no-results">Showing first 100 of ' + filtered.length + ' results. Narrow your search to see more.</div>';
+    }
+    resultsDiv.innerHTML = html;
+  }
+
+  window.toggleDesc = function(id, btn) {
+    const el = document.getElementById(id);
+    el.classList.toggle('expanded');
+    btn.textContent = el.classList.contains('expanded') ? 'show less' : 'show more';
+  };
+
+  // ── Map View ──
+
+  function initMap() {
+    if (map) return;
+    map = L.map('map').setView([31.5, 34.8], 8);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19,
+    }).addTo(map);
+    markerGroup = L.markerClusterGroup({ maxClusterRadius: 40 });
+    map.addLayer(markerGroup);
+  }
+
+  function renderMap(filtered) {
+    initMap();
+    markerGroup.clearLayers();
+    if (originMarker) { map.removeLayer(originMarker); originMarker = null; }
+
+    const withCoords = filtered.filter(c => c.lat != null);
+    withCoords.forEach(club => {
+      const distHtml = (originLat != null && club._dist != null && club._dist < 99999)
+        ? '<div class="map-popup-dist">' + formatDist(club._dist) + '</div>' : '';
+      const desc = club.d || '';
+      const popup = '<div style="direction:rtl;min-width:220px;max-width:320px">' +
+        '<div class="map-popup-title">' + escapeHtml(club.t) + '</div>' +
+        '<div class="map-popup-addr">' + escapeHtml(club.a) + '</div>' +
+        (desc ? '<div class="map-popup-desc">' + escapeHtml(desc) + '</div>' : '') +
+        distHtml +
+        '</div>';
+      L.marker([club.lat, club.lng])
+        .bindTooltip(escapeHtml(club.t), { direction: 'right', offset: [5, 0] })
+        .bindPopup(popup, { maxHeight: 300 })
+        .addTo(markerGroup);
+    });
+
+    if (originLat != null) {
+      originMarker = L.marker([originLat, originLng], {
+        icon: L.divIcon({
+          className: '',
+          html: '<div style="width:16px;height:16px;background:#e74c3c;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.3)"></div>',
+          iconSize: [16, 16],
+          iconAnchor: [8, 8],
+        })
+      }).addTo(map).bindPopup('<b>Your location</b>');
+    }
+
+    if (originLat) {
+      map.setView([originLat, originLng], 14);
+    } else if (withCoords.length) {
+      const bounds = L.latLngBounds(withCoords.map(c => [c.lat, c.lng]));
+      map.fitBounds(bounds, { padding: [30, 30] });
+    }
+
+    setTimeout(() => map.invalidateSize(), 100);
+  }
+
+  // ── Search Logic ──
+
+  function doSearch() {
+    const query = qInput.value.trim().toLowerCase();
+    const city = citySelect.value;
+    const terms = query ? query.split(/\s+/) : [];
+    let filtered = CLUBS;
+    if (city) filtered = filtered.filter(c => c.c === city);
+    if (terms.length) {
+      filtered = filtered.filter(club => {
+        const blob = (club.t + ' ' + club.a + ' ' + club.d).toLowerCase();
+        return terms.every(t => blob.includes(t));
+      });
+    }
+    if (originLat != null) {
+      filtered.forEach(club => {
+        club._dist = (club.lat != null) ? distanceKm(originLat, originLng, club.lat, club.lng) : 99999;
+      });
+      filtered = filtered.slice().sort((a, b) => a._dist - b._dist);
+    }
+
+    countEl.textContent = filtered.length;
+    lastFiltered = filtered;
+
+    if (currentView === 'list') {
+      renderList(filtered, terms);
+    } else {
+      renderMap(filtered);
+    }
+  }
+
+  // ── View Toggle ──
+
+  function setView(view) {
+    currentView = view;
+    viewListBtn.classList.toggle('active', view === 'list');
+    viewMapBtn.classList.toggle('active', view === 'map');
+    resultsDiv.style.display = view === 'list' ? '' : 'none';
+    mapContainer.classList.toggle('hidden', view !== 'map');
+    doSearch();
+    if (view === 'map' && map) {
+      setTimeout(() => map.invalidateSize(), 200);
+    }
+  }
+
+  viewListBtn.addEventListener('click', () => setView('list'));
+  viewMapBtn.addEventListener('click', () => setView('map'));
+
+  // ── Location ──
+
+  function setOrigin(lat, lng, label) {
+    originLat = lat;
+    originLng = lng;
+    locStatus.textContent = ' | Sorted by distance from: ' + label;
+    clearLocBtn.style.display = '';
+    doSearch();
+  }
+
+  function clearOrigin() {
+    originLat = null;
+    originLng = null;
+    locStatus.textContent = '';
+    clearLocBtn.style.display = 'none';
+    addressInput.value = '';
+    gpsBtn.classList.remove('active');
+    doSearch();
+  }
+
+  // ── Autocomplete ──
+
+  function closeAC() {
+    acList.classList.remove('open');
+    acList.innerHTML = '';
+    acItems = [];
+    acSelected = -1;
+  }
+
+  async function fetchSuggestions(query) {
+    const resp = await fetch('https://nominatim.openstreetmap.org/search?' + new URLSearchParams({
+      q: query, format: 'json', limit: '6', countrycodes: 'il', addressdetails: '1',
+    }), { headers: { 'Accept': 'application/json' } });
+    if (!resp.ok) return [];
+    return resp.json();
+  }
+
+  function renderAC(results) {
+    if (!results.length) { closeAC(); return; }
+    acItems = results;
+    acSelected = -1;
+    let html = '';
+    results.forEach((r, i) => {
+      const name = r.display_name.split(',').slice(0, 3).join(', ');
+      html += '<div class="ac-item" data-idx="' + i + '">' + escapeHtml(name) + '</div>';
+    });
+    acList.innerHTML = html;
+    acList.classList.add('open');
+    acList.querySelectorAll('.ac-item').forEach(el => {
+      el.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        selectAC(parseInt(this.dataset.idx));
+      });
+    });
+  }
+
+  function selectAC(idx) {
+    const item = acItems[idx];
+    if (!item) return;
+    const label = item.display_name.split(',').slice(0, 3).join(', ');
+    addressInput.value = label;
+    setOrigin(parseFloat(item.lat), parseFloat(item.lon), label);
+    closeAC();
+  }
+
+  function highlightACItem(idx) {
+    acList.querySelectorAll('.ac-item').forEach((el, i) => {
+      el.classList.toggle('selected', i === idx);
+    });
+  }
+
+  addressInput.addEventListener('input', function() {
+    clearTimeout(acTimer);
+    const val = this.value.trim();
+    if (val.length < 2) { closeAC(); return; }
+    acList.innerHTML = '<div class="ac-loading">searching...</div>';
+    acList.classList.add('open');
+    acTimer = setTimeout(async () => {
+      try { renderAC(await fetchSuggestions(val)); }
+      catch (e) { closeAC(); }
+    }, 400);
+  });
+
+  addressInput.addEventListener('keydown', function(e) {
+    if (!acList.classList.contains('open') || !acItems.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); acSelected = Math.min(acSelected + 1, acItems.length - 1); highlightACItem(acSelected); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); acSelected = Math.max(acSelected - 1, 0); highlightACItem(acSelected); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (acSelected >= 0) selectAC(acSelected); }
+    else if (e.key === 'Escape') closeAC();
+  });
+
+  addressInput.addEventListener('blur', () => setTimeout(closeAC, 200));
+  document.addEventListener('click', e => { if (!e.target.closest('.ac-wrap')) closeAC(); });
+
+  // ── GPS ──
+
+  gpsBtn.addEventListener('click', function() {
+    gpsBtn.textContent = '...';
+    navigator.geolocation.getCurrentPosition(
+      function(pos) {
+        gpsBtn.textContent = 'Use GPS';
+        gpsBtn.classList.add('active');
+        addressInput.value = '';
+        setOrigin(pos.coords.latitude, pos.coords.longitude, 'GPS location');
+      },
+      function() {
+        gpsBtn.textContent = 'Use GPS';
+        locStatus.textContent = 'Location access denied';
+        setTimeout(() => { if (!originLat) locStatus.textContent = ''; }, 3000);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  });
+
+  clearLocBtn.addEventListener('click', clearOrigin);
+
+  let timer;
+  qInput.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(doSearch, 200); });
+  citySelect.addEventListener('change', doSearch);
+
+  doSearch();
+})();
+</script>
+
+</body>
+</html>
