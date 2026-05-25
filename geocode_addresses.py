@@ -48,15 +48,15 @@ def main():
     else:
         coords = {}
 
-    # Collect unique addresses to geocode (Tel Aviv only for now)
+    # Collect all unique addresses to geocode
     unique_addrs = {}
     for c in clubs:
         addr = c.get("address", "")
-        if addr and "תל אביב" in addr and addr not in coords:
+        if addr and addr not in coords:
             unique_addrs[addr] = True
 
     remaining = sorted(unique_addrs.keys())
-    print(f"Geocoding {len(remaining)} Tel Aviv addresses ({len(coords)} already cached)...")
+    print(f"Geocoding {len(remaining)} addresses ({len(coords)} already cached)...")
 
     for i, addr in enumerate(remaining):
         print(f"  [{i+1}/{len(remaining)}] {addr}...", end=" ", flush=True)
